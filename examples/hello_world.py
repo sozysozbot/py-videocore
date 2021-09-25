@@ -14,10 +14,10 @@ def hello_world(asm):
     setup_vpm_read(nrows=2)
     setup_vpm_write()
 
-    # Compute a + b
+    # Compute a - b
     mov(r0, vpm)
     mov(r1, vpm)
-    fadd(vpm, r0, r1)
+    fsub(vpm, r0, r1)
 
     # Store the result vector from VPM to the host memory (address=uniforms[1])
     setup_dma_store(nrows=1)
@@ -47,8 +47,8 @@ with Driver() as drv:
     print(a)
     print(' b '.center(80, '='))
     print(b)
-    print(' a+b '.center(80, '='))
+    print(' a-b '.center(80, '='))
     print(out)
     print(' error '.center(80, '='))
-    print(np.abs(a+b-out))
+    print(np.abs(a-b-out))
 
