@@ -225,16 +225,79 @@ def hello_world(asm):
     mov(sfu_recipsqrt, r1)
     nop()
     nop()
-    fmul(rb2, r0, r4) 
+    fmul(r0, r0, r4) 
+    mov(rb2, r0)
     """
     DONE computing Q = rb2 = [...e1, ...e2, ...e3, ...e4]
     """
 
+    """
+    Okay, to finish off, we need R = [e1.dot(a1), 0, 0, 0, e1.dot(a2), e2.dot(a2), 0, 0, e1.dot(a3), e2.dot(a3), e3.dot(a3), 0 ... ]
+    """
 
+    mov(r1, 0.0)
+    ldi(null,[0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],set_flags=True)
+    mov(r1, r0, cond='zs') 
+    # r1: [...e1, ...0vec, ...0vec, ...0vec]
+    nop(); rotate(r2, r1, 4); fadd(r1, r1, r2); nop(); rotate(r2, r1, 8); fadd(r2, r1, r2)
+    # r2: [...e1, ...e1, ...e1, ...e1]
+    fmul(r2, r2, rb0)
+    # r2: [...(e1*a1), ...(e1*a2), ...(e1*a3), ...(e1*a4)]
+    nop(); rotate(r3, r2, 14); fadd(r3, r3, r2); nop(); rotate(r2, r3, 15); fadd(r2, r3, r2)
+    # r2: [e1.dot(a1), ?, ?, ?, e1.dot(a2), ?, ?, ?, e1.dot(a3), ?, ?, ?, e1.dot(a4), ?, ?, ?]
+
+    mov(rb3, 0.0)
+    ldi(null,[0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1],set_flags=True)
+    mov(rb3, r2, cond='zs') 
+    # rb3: [e1.dot(a1), 0, 0, 0, e1.dot(a2), 0, 0, 0, e1.dot(a3), 0, 0, 0, e1.dot(a4), 0, 0, 0]
+
+    mov(r1, 0.0)
+    ldi(null,[1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1],set_flags=True)
+    mov(r1, r0, cond='zs') 
+    # r1: [...0vec, ...e2, ...0vec, ...0vec]
+    nop(); rotate(r2, r1, 4); fadd(r2, r1, r2); rotate(r3, r1, 8); fadd(r2, r3, r2); 
+    # r2: [...0vec, ...e2, ...e2, ...e2]
+    fmul(r2, r2, rb0)
+    # r2: [...0vec, ...(e2*a2), ...(e2*a3), ...(e2*a4)]
+    nop(); rotate(r3, r2, 14); fadd(r3, r3, r2); nop(); rotate(r2, r3, 15); fadd(r2, r3, r2)
+    # r2: [0, ?, ?, ?, e2.dot(a2), ?, ?, ?, e2.dot(a3), ?, ?, ?, e2.dot(a4), ?, ?, ?]
+    nop(); rotate(r2, r2, 1); 
+    ldi(null,[1,1,1,1,1,0,1,1,1,0,1,1,1,0,1,1],set_flags=True)
+    fadd(rb3, rb3, r2, cond='zs')
+
+    mov(r1, 0.0)
+    ldi(null,[1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,1],set_flags=True)
+    mov(r1, r0, cond='zs') 
+    # r1: [...0vec, ...0vec, ...e3, ...0vec]
+    nop(); rotate(r2, r1, 4); fadd(r2, r1, r2)
+    # r2: [...0vec, ...0vec, ...e3, ...e3]
+    fmul(r2, r2, rb0)
+    # r2: [...0vec, ...0vec, ...(e3*a3), ...(e3*a4)]
+    nop(); rotate(r3, r2, 14); fadd(r3, r3, r2); nop(); rotate(r2, r3, 15); fadd(r2, r3, r2)
+    # r2: [0, ?, ?, ?, 0, ?, ?, ?, e2.dot(a3), ?, ?, ?, e2.dot(a4), ?, ?, ?]
+    nop(); rotate(r2, r2, 2); 
+    ldi(null,[1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1],set_flags=True)
+    fadd(rb3, rb3, r2, cond='zs')
+
+    mov(r1, 0.0)
+    ldi(null,[1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],set_flags=True)
+    mov(r1, r0, cond='zs') 
+    # r1: [...0vec, ...0vec, ...0vec, ...e4]
+    fmul(r2, r1, rb0)
+    # r2: [...0vec, ...0vec, ...0vec, ...(e4*a4)]
+    nop(); rotate(r3, r2, 14); fadd(r3, r3, r2); nop(); rotate(r2, r3, 15); fadd(r2, r3, r2)
+    # r2: [0, ?, ?, ?, 0, ?, ?, ?, 0, ?, ?, ?, e4.dot(a4), ?, ?, ?]
+    nop(); rotate(r2, r2, 3); 
+    ldi(null,[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],set_flags=True)
+    fadd(rb3, rb3, r2, cond='zs')
+
+    """
+    R Complete!!!
+    """
 
     mov(vpm, rb1)
     mov(vpm, rb2)
-    mov(vpm, r1)
+    mov(vpm, rb3)
 
     # Store the resulting vectors from VPM to the host memory (address=uniforms[1])
     setup_dma_store(nrows=3)
@@ -286,6 +349,8 @@ with Driver() as drv:
 
     print(' R '.center(80, '='))
     print(r)
-    print(' error '.center(80, '='))
+    print(' A - Q@R '.center(80, '='))
+    np.set_printoptions(suppress=True)
     print(np.abs(a_mat-(q@r)))
+    np.set_printoptions(suppress=False)
 
