@@ -16,13 +16,15 @@ def hello_world(asm):
 
     mov(r0, vpm)
     # r0: [...a1, ...a2, ...a3, ...a4]
-    mov(r1, 0.0)
-    # r1: [...0vec, ...0vec, ...0vec, ...0vec]
+    mov(rb0, r0)
+    # STORE: rb0: [...a1, ...a2, ...a3, ...a4]
+    
 
     """
     Compute u2 = a2 - (u1 * u1.dot(a2) / u1.dot(u1)).
     """
 
+    mov(r1, 0.0)
     ldi(null,[0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],set_flags=True)
     mov(r1, r0, cond='zs') 
     # r1: [...u1, ...0vec, ...0vec, ...0vec]
@@ -202,16 +204,40 @@ def hello_world(asm):
     nop(); rotate(r1, r1, 4); fsub(r0, r0, r1)
     # r0: [...u1, ...u2, ...u3, ...u4] where u4 = t4 - (u3 * u3.dot(s4) / u3.dot(u3))
 
+    mov(rb1, r0)
     """
-    DONE!!!
+    DONE computing U = rb1 = [...u1, ...u2, ...u3, ...u4]
+    """
+
+    """
+    Now, let's compute Q
+    """
+
+    mov(r2, r0); fmul(r2, r2, r2); nop(); rotate(r3, r2, 14); fadd(r3, r3, r2)
+    nop(); rotate(r2, r3, 15); fadd(r2, r3, r2); 
+    # r2 has [u1.dot(u1), ?, ?, ?, u2.dot(u2), ?, ?, ?, u3.dot(u3), ?, ?, ?, u4.dot(u4), ?, ?, ?]
+    mov(r1, 0.0)
+    ldi(null,[0,1,1,1,0,1,1,1,0,1,1,1,0,1,1,1],set_flags=True)
+    mov(r1, r2, cond='zs') 
+    # r1 has [u1.dot(u1), 0, 0, 0, u2.dot(u2), 0, 0, 0, u3.dot(u3), 0, 0, 0, u4.dot(u4), 0, 0, 0]
+    nop(); rotate(r2, r1, 1); fadd(r1, r1, r2); nop(); rotate(r2, r1, 2); fadd(r1, r1, r2)
+    # r1 has [u1.dot(u1) x 4, u2.dot(u2) x 4, u3.dot(u3) x 4, u4.dot(u4) x 4]
+    mov(sfu_recipsqrt, r1)
+    nop()
+    nop()
+    fmul(rb2, r0, r4) 
+    """
+    DONE computing Q = rb2 = [...e1, ...e2, ...e3, ...e4]
     """
 
 
-    mov(vpm, r0)
+
+    mov(vpm, rb1)
+    mov(vpm, rb2)
     mov(vpm, r1)
 
     # Store the resulting vectors from VPM to the host memory (address=uniforms[1])
-    setup_dma_store(nrows=2)
+    setup_dma_store(nrows=3)
     start_dma_store(uniform)
     wait_dma_store()
 
@@ -225,7 +251,7 @@ with Driver() as drv:
 
     # Copy vectors to shared memory for DMA transfer
     inp = drv.copy(np.r_[a_vec])
-    out = drv.alloc(dim * dim * 2, 'float32')
+    out = drv.alloc(dim * dim * 3, 'float32')
 
     # Run the program
     drv.execute(
@@ -238,20 +264,28 @@ with Driver() as drv:
     print(' A '.center(80, '='))
     print(a_mat)
 
-    (u_t, r_t) = out.reshape((2, dim, dim))
+    (u_t, q_t, r_t) = out.reshape((3, dim, dim))
     u = u_t.transpose()
+    q = q_t.transpose()
     r = r_t.transpose()
     
     print(' U '.center(80, '='))
     print(u)
-    print(' R '.center(80, '='))
-    print(r)
     print(' U^T @ U '.center(80, '='))
     np.set_printoptions(suppress=True)
     print(u_t @ u)
     np.set_printoptions(suppress=False)
-    print(' error '.center(80, '='))
+   
+    print(' Q '.center(80, '='))
+    print(q)
 
-    q = u
+    print(' Q^T @ Q '.center(80, '='))
+    np.set_printoptions(suppress=True)
+    print(q_t @ q)
+    np.set_printoptions(suppress=False)
+
+    print(' R '.center(80, '='))
+    print(r)
+    print(' error '.center(80, '='))
     print(np.abs(a_mat-(q@r)))
 
