@@ -238,18 +238,20 @@ with Driver() as drv:
     print(' A '.center(80, '='))
     print(a_mat)
 
-    (q_t, r_t) = out.reshape((2, dim, dim))
-    q = q_t.transpose()
+    (u_t, r_t) = out.reshape((2, dim, dim))
+    u = u_t.transpose()
     r = r_t.transpose()
-
-    print(' Q '.center(80, '='))
-    print(q)
+    
+    print(' U '.center(80, '='))
+    print(u)
     print(' R '.center(80, '='))
     print(r)
-    print(' Q^T @ Q '.center(80, '='))
+    print(' U^T @ U '.center(80, '='))
     np.set_printoptions(suppress=True)
-    print(q_t @ q)
+    print(u_t @ u)
     np.set_printoptions(suppress=False)
     print(' error '.center(80, '='))
+
+    q = u
     print(np.abs(a_mat-(q@r)))
 
