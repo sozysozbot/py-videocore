@@ -98,10 +98,50 @@ def hello_world(asm):
     # r1 has [...(u1 * u1.dot(a3) / u1.dot(u1)), ...0vec, ...0vec, ...0vec] 
     nop(); rotate(r1, r1, 8); fsub(r0, r0, r1)
     # r0: [...u1, ...u2, ...t3, ...a4] where t3 = a3 - (u1 * u1.dot(a3) / u1.dot(u1))
+
+
     # Projecting t3 further onto u2 is fine. Hence we want u3 = t3 - (u2 * u2.dot(t3) / u2.dot(u2)) 
 
+
+    mov(r2, r0); fmul(r2, r2, r2); nop(); rotate(r3, r2, 14); fadd(r3, r3, r2)
+    nop(); rotate(r2, r3, 15); fadd(r2, r3, r2); 
+    # r2 has [u1.dot(u1), ?, ?, ?, u2.dot(u2), ?, ?, ?, t3.dot(t3), ?, ?, ?, a4.dot(a4), ?, ?, ?]
+    nop(); rotate(r2, r2, 12); mov(broadcast, r2) 
+    # r5 has u2.dot(u2)
+
+    mov(r1, 0.0)
+    ldi(null,[1,1,1,1,0,0,0,0,1,1,1,1,1,1,1,1],set_flags=True)
+    mov(r1, r0, cond='zs') 
+    # r1 has [...0vec, ...u2, ...0vec, ...0vec]
+
+    mov(sfu_recip, r5)
+    nop()
+    nop()
+    fmul(r1, r1, r4) 
+    # r1 has [...0vec, ...(u2 / u2.dot(u2)), ...0vec, ...0vec]
+
+    mov(ra1, r1)
+    # STORE THIS FOR LATER USE
+    # ra1: [...0vec, ...(u2 / u2.dot(u2)), ...0vec, ...0vec]
+
+    nop(); rotate(r2, r0, 4)
+    # r2: [...a4, ...u1, ...u2, ...t3]
+    # r0: [...u1, ...u2, ...t3, ...a4]
+    fmul(r2, r2, r0)
+    # r2: [???, ???, u2*t3, ???]
+    nop(); rotate(r3, r2, 14); fadd(r3, r3, r2); nop(); rotate(r2, r3, 15); fadd(r2, r3, r2); nop(); rotate(r2, r2, 8); mov(broadcast, r2)
+    # r5 has u2.dot(t3)
+    fmul(r1, r1, r5)
+    # r1:  [...0vec, ...(u2 * u2.dot(t3) / u2.dot(u2)), ...0vec, ...0vec]
+    nop(); rotate(r1, r1, 4); fsub(r0, r0, r1)
+    # r0: [...u1, ...u2, ...u3, ...a4]
+    
+    """
+    # Finish computing u3!!!!
+    """
+
     mov(vpm, r0)
-    mov(vpm, 0.0)
+    mov(vpm, r5)
 
     # Store the resulting vectors from VPM to the host memory (address=uniforms[1])
     setup_dma_store(nrows=2)
