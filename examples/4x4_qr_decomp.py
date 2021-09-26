@@ -52,6 +52,11 @@ def hello_world(asm):
     nop()
     fmul(r1, r1, r4) 
     # r1 has [...(u1 / u1.dot(u1)), ...0vec, ...0vec, ...0vec]
+
+    mov(ra0, r1)
+    # STORE THIS FOR LATER USE
+    # ra0: [...(u1 / u1.dot(u1)), ...0vec, ...0vec, ...0vec]
+
     fmul(r2, r2, r0) 
     # r2 has [...0vec, ...(u1*a2), ...0vec, ...0vec]
     # let r2 be [...0vec, A, B, C, D, ...0vec, ...0vec]
@@ -76,6 +81,25 @@ def hello_world(asm):
     """
     Finish computing u2!!!!
     """
+
+    """
+    Next, compute u3.
+    Note that ra0: [...(u1 / u1.dot(u1)), ...0vec, ...0vec, ...0vec] can be used
+    """
+
+    ldi(null,[0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],set_flags=True)
+    mov(r1, r0, cond='zs') 
+    nop(); rotate(r2, r1, 8) # r2 has [...0vec, ...0vec, ...u1, ...0vec]
+    fmul(r2, r2, r0) 
+    # r2 has [...0vec, ...0vec, ...(u1*a3), ...0vec]
+    nop(); rotate(r3, r2, 14); fadd(r3, r3, r2); nop(); rotate(r2, r3, 15); fadd(r2, r3, r2); nop(); rotate(r2, r2, 8); mov(broadcast, r2)
+    # r5 has u1.dot(a3)
+    mov(r1, ra0); fmul(r1, r1, r5)
+    # r1 has [...(u1 * u1.dot(a3) / u1.dot(u1)), ...0vec, ...0vec, ...0vec] 
+    nop(); rotate(r1, r1, 8); fsub(r0, r0, r1)
+    # r0: [...u1, ...u2, ...t3, ...a4] where t3 = a3 - (u1 * u1.dot(a3) / u1.dot(u1))
+    # Projecting t3 further onto u2 is fine. Hence we want u3 = t3 - (u2 * u2.dot(t3) / u2.dot(u2)) 
+
     mov(vpm, r0)
     mov(vpm, 0.0)
 
@@ -116,7 +140,9 @@ with Driver() as drv:
     print(' R '.center(80, '='))
     print(r)
     print(' Q^T @ Q '.center(80, '='))
+    np.set_printoptions(suppress=True)
     print(q_t @ q)
+    np.set_printoptions(suppress=False)
     print(' error '.center(80, '='))
     print(np.abs(a_mat-(q@r)))
 
